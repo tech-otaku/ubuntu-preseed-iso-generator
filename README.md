@@ -1,7 +1,52 @@
-# Ubuntu Preseed ISO Generator
-Generate an ISO image for automated Ubuntu 20.04 desktop installations. This script uses the traditional preseed method.
+This is a fork of the [Ubuntu Preseed ISO Generator](https://github.com/covertsh/ubuntu-preseed-iso-generator) modified to run on macOS.
 
-## [Looking for the server version?](https://github.com/covertsh/ubuntu-autoinstall-generator)
+# Ubuntu Preseed ISO Generator for macOS
+The script runs on macOS and will generate an ISO image for an automated Ubuntu 20.04 desktop installations that can be copied to a bootable USB flash drive. This script uses the traditional preseed method.
+
+---
+
+### Modifications for macOS
+
+Changes to allow the script to execute on macOS include:
+
+#### Required Utilities
+
+If Homebrew is installed, offer to install the following utilities if they're not available:
+
+- `curl`
+- `gpg`
+- `sed`
+- `xorriso`
+
+#### Required Binaries
+Use `stat` instead of `realpath` as the latter is not readibly available
+on macOS.
+
+#### Integrity Check Using GPG
+Set the correct ownership and permissions on the `$HOME/.gnupg` directory
+required by `gpg`. Create it first if it doesn't exist.
+
+```
+/
+|-- Users/
+    |-- $USER/
+        |-- .gnupg/          $USER:staff rwx------ [700]
+            |-- file         $USER:staff rw------- [600]
+            |-- directory/   $USER:staff rwx------ [700]
+                |-- file     $USER:staff rw------- [600]
+```
+
+
+#### Creating a Bootable Hybrid ISO Image
+
+Create the MBR template file named `isohdpfx.bin` requied by `xorriso`
+to create a hybrid ISO image. This is achieved by copying the first 512 bytes of the downloaded Ubuntu Desktop ISO image using `dd`. See [Booting USB with custom iso file](https://askubuntu.com/a/980340).
+
+##### Tested with
+- macOS Monterey 12.3.1 host
+- Ubuntu Desktop 20.04 ISO image
+
+---
 
 ### Behavior
 
