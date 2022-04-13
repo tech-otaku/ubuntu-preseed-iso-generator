@@ -31,6 +31,9 @@ function offer_to_install() {
             gpg)
                 utility=gnupg
                 ;;
+            sed)
+                utility=gnu-sed
+                ;;
             * )
                 utility=$1
                 ;;
