@@ -25,6 +25,38 @@ function die() {
         exit "$code"
 }
 
+function offer_to_install() {
+    if [[ -x $(command -v brew) ]]; then
+        case $1 in
+            gpg)
+                utility=gnupg
+                ;;
+            * )
+                utility=$1
+                ;;
+        esac
+        while true; do
+            read -p "Can't find $1. Do you want to install it [y/N]? " yn
+            case $yn in
+                [Yy]* )
+                    log "🔧 Installing $1 via Homebrew..."
+                    brew install $utility 1> /dev/null 2> /dev/null
+                    log "👍 Installed $1"
+                    break
+                    ;;
+                [Nn]* ) 
+                    die "💥 $1 is required by this script. Exiting..." 
+                    ;;
+                * ) 
+                    echo "Please answer [y]es or [N]o."
+                    ;;
+            esac
+        done
+    else
+        die "💥 $1 is not installed."
+    fi
+}
+
 usage() {
         cat <<EOF
 Usage: $(basename "${BASH_SOURCE[0]}") [-h] [-k] [-v] [-p preseed-configuration-file] [-s source-iso-file] [-d destination-iso-file]
@@ -90,8 +122,8 @@ function parse_params() {
                 [[ ! -f "${source_iso}" ]] && die "💥 Source ISO file could not be found."
         fi
 
-        destination_iso=$(realpath "${destination_iso}")
-        source_iso=$(realpath "${source_iso}")
+        destination_iso=$(stat -f%R "${destination_iso}")
+        source_iso=$(stat -f%R  "${source_iso}")
 
         return 0
 }
@@ -109,12 +141,26 @@ else
 fi
 
 log "🔎 Checking for required utilities..."
-[[ ! -x "$(command -v xorriso)" ]] && die "💥 xorriso is not installed."
-[[ ! -x "$(command -v sed)" ]] && die "💥 sed is not installed."
-[[ ! -x "$(command -v curl)" ]] && die "💥 curl is not installed."
-[[ ! -x "$(command -v gpg)" ]] && die "💥 gpg is not installed."
-[[ ! -f "/usr/lib/ISOLINUX/isohdpfx.bin" ]] && die "💥 isolinux is not installed."
+[[ ! -x "$(command -v xorriso)" ]] && offer_to_install 'xorriso'
+[[ ! -x "$(command -v sed)" ]] && offer_to_install 'sed'
+[[ ! -x "$(command -v curl)" ]] && offer_to_install 'curl'
+[[ ! -x "$(command -v gpg)" ]] && offer_to_install 'gpg'
 log "👍 All required utilities are installed."
+
+#log "🔎 Checking the $HOME/.gnupg directory exists..."
+if [ ! -d $HOME/.gnupg ]; then
+    log "🔧 Creating the $HOME/.gnupg directory..."
+    mkdir $HOME/.gnupg
+    log "👍 Created the $HOME/.gnupg directory."
+#else
+#    log "👍 The $HOME/.gnupg directory exists."
+fi
+
+log "🔧 Setting correct ownership and permissions for $HOME/.gnupg..."
+chown -R $(whoami) $HOME/.gnupg/
+find ~/.gnupg -type f -exec chmod 600 {} \;
+find ~/.gnupg -type d -exec chmod 700 {} \;
+log "👍 Correct ownership and permissions set for $HOME/.gnupg."
 
 if [ ! -f "${source_iso}" ]; then
         log "🌎 Downloading current daily ISO image for Ubuntu 20.04 Focal Fossa..."
@@ -172,6 +218,13 @@ chmod -R u+w "$tmpdir"
 rm -rf "$tmpdir/"'[BOOT]'
 log "👍 Extracted to $tmpdir"
 
+# Create the MBR template file required by the xorriso binary when repackaging the extracted files into an ISO image.
+# This is done by copying the first 512 bytes of the downloaded Ubuntu Desktop ISO image to the file isohdpfx.bin
+# See https://askubuntu.com/a/980340 and https://askubuntu.com/a/980265
+log "🔧 Creating MBR template file..."
+dd if="${source_iso}" bs=512 count=1 of="${script_dir}/isohdpfx.bin" status=none 
+log "👍 Created MBR template file ${script_dir}/isohdpfx.bin"
+
 log "🧩 Adding preseed parameters to kernel command line..."
 
 # These are for UEFI mode
@@ -204,7 +257,7 @@ log "👍 Updated hashes."
 
 log "📦 Repackaging extracted files into an ISO image..."
 cd "$tmpdir"
-xorriso -as mkisofs -r -V "ubuntu-preseed-$today" -J -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -isohybrid-mbr /usr/lib/ISOLINUX/isohdpfx.bin -boot-info-table -input-charset utf-8 -eltorito-alt-boot -e boot/grub/efi.img -no-emul-boot -isohybrid-gpt-basdat -o "${destination_iso}" . &>/dev/null
+xorriso -as mkisofs -r -V "ubuntu-preseed-$today" -J -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -isohybrid-mbr ${script_dir}/isohdpfx.bin -boot-info-table -input-charset utf-8 -eltorito-alt-boot -e boot/grub/efi.img -no-emul-boot -isohybrid-gpt-basdat -o "${destination_iso}" . &>/dev/null
 cd "$OLDPWD"
 log "👍 Repackaged into ${destination_iso}"
 
