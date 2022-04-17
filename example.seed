@@ -1,7 +1,8 @@
 # Based on https://askubuntu.com/questions/806820/how-do-i-create-a-completely-unattended-install-of-ubuntu-desktop-16-04-1-lts
 
 # Partitioning
-ubiquity partman-auto/init_automatically_partition select biggest_free
+ubiquity partman-auto/disk string /dev/sda
+ubiquity partman-auto/method string regular
 ubiquity partman-lvm/device_remove_lvm boolean true
 ubiquity partman-md/device_remove_md boolean true
 ubiquity partman-auto/choose_recipe select atomic
@@ -54,7 +55,13 @@ d-i finish-install/reboot_in_progress note
 ubiquity ubiquity/success_command string \
   in-target apt update;\
   in-target apt remove -y gnome-initial-setup;\
-  in-target apt install -y open-vm-tools
+  in-target apt install -y open-vm-tools;\
+# If it exists on the USB flash drive installer, copy the 'include' directory to the newly created user account and set appropriate ownership and permissions.
+  [ -d /cdrom/include ] && cp -a /cdrom/include /target/home/user;\
+  [ -d /target/home/user/include ] && in-target chown -R user:user /home/user/include;\
+  [ -d /target/home/user/include ] && in-target find /home/user/include -type d -exec chmod 744 {} \;;\
+  [ -d /target/home/user/include ] && in-target find /home/user/include -type f -name *.sh -exec chmod 700 {} \;;\
+  [ -d /target/home/user/include ] && in-target find /home/user/include -type f ! -name *.sh -exec chmod 600 {} \;
 
 # Poweroff after install
 ubiquity ubiquity/poweroff boolean true
