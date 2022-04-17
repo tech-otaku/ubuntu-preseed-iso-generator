@@ -82,6 +82,7 @@ Available options:
 -d, --destination   Destination ISO file. By default ${script_dir}/ubuntu-preseed-$today.iso will be
                     created, overwriting any existing file.
 -i, --include       Copy the ./include directory to the root of the destination ISO file.
+-u, --user          The name of the user account to create. Defaults to 'User' if omitted.
 EOF
         exit
 }
@@ -93,6 +94,7 @@ function parse_params() {
         destination_iso="${script_dir}/ubuntu-preseed-$today.iso"
         gpg_verify=1
         include=0
+        uaccount="User"
 
         while :; do
                 case "${1-}" in
@@ -112,6 +114,10 @@ function parse_params() {
                         shift
                         ;;
                 -i | --include) include=1 ;;
+                -u | --user)
+                        uaccount="${2-}"
+                        shift
+                        ;;
                 -?*) die "Unknown option: $1" ;;
                 *) break ;;
                 esac
@@ -250,7 +256,11 @@ log "👍 Added parameters to UEFI and BIOS kernel command lines."
 
 log "🧩 Adding preseed configuration file..."
 cp "$preseed_file" "$tmpdir/preseed/custom.seed"
+sed -i '' "s/_USER_NAME_CAPITALISED_/$(echo $uaccount | awk '{print toupper(substr($0,0,1))tolower(substr($0,2))}')/" "$tmpdir/preseed/custom.seed"
+sed -i '' "s/_USER_NAME_LOWERCASE_/$(echo $uaccount | awk '{print tolower(substr($0,1))}')/g" "$tmpdir/preseed/custom.seed"
 log "👍 Added preseed file"
+
+
 
 if [ ${include} -eq 1 ]; then
     log "🧩 Adding ./include directory..."
