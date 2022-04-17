@@ -37,8 +37,8 @@ d-i apt-setup/restricted boolean true
 d-i apt-setup/universe boolean true
 
 # Users
-d-i passwd/user-fullname string User
-d-i passwd/username string user
+d-i passwd/user-fullname string _USER_NAME_CAPITALISED_
+d-i passwd/username string _USER_NAME_LOWERCASE_
 # Password: ubuntu
 # Generate with "openssl passwd -6"
 d-i passwd/user-password-crypted password $6$eRzcYyR3Xw2elP6l$l7JXHXxbXRgD8KCx4xFt4q7aJFpsUfjjMHbfYZAlJ56GLSspojJ6ODxlauuauL72jYbwhEhGwUmzgImIVCFle0
@@ -57,11 +57,13 @@ ubiquity ubiquity/success_command string \
   in-target apt remove -y gnome-initial-setup;\
   in-target apt install -y open-vm-tools;\
 # If it exists on the USB flash drive installer, copy the 'include' directory to the newly created user account and set appropriate ownership and permissions.
-  [ -d /cdrom/include ] && cp -a /cdrom/include /target/home/user;\
-  [ -d /target/home/user/include ] && in-target chown -R user:user /home/user/include;\
-  [ -d /target/home/user/include ] && in-target find /home/user/include -type d -exec chmod 744 {} \;;\
-  [ -d /target/home/user/include ] && in-target find /home/user/include -type f -name *.sh -exec chmod 700 {} \;;\
-  [ -d /target/home/user/include ] && in-target find /home/user/include -type f ! -name *.sh -exec chmod 600 {} \;
+  [ -d /cdrom/include ] && cp -a /cdrom/include /target/home/_USER_NAME_LOWERCASE_;\
+  [ -d /target/home/_USER_NAME_LOWERCASE_/include ] && in-target chown -R _USER_NAME_LOWERCASE_:_USER_NAME_LOWERCASE_ /home/_USER_NAME_LOWERCASE_/include;\
+  [ -d /target/home/_USER_NAME_LOWERCASE_/include ] && in-target find /home/_USER_NAME_LOWERCASE_/include -type d -exec chmod 744 {} \;;\
+  [ -d /target/home/_USER_NAME_LOWERCASE_/include ] && in-target find /home/_USER_NAME_LOWERCASE_/include -type f -name *.sh -exec chmod 700 {} \;;\
+  [ -d /target/home/_USER_NAME_LOWERCASE_/include ] && in-target find /home/_USER_NAME_LOWERCASE_/include -type f ! -name *.sh -exec chmod 600 {} \;;\
+# Force password change on initial login
+  in-target chage -d 0 _USER_NAME_LOWERCASE_
 
 # Poweroff after install
 ubiquity ubiquity/poweroff boolean true
