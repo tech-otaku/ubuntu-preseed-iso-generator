@@ -81,6 +81,7 @@ Available options:
                     That file will be used by default if it already exists.
 -d, --destination   Destination ISO file. By default ${script_dir}/ubuntu-preseed-$today.iso will be
                     created, overwriting any existing file.
+-i, --include       Copy the ./include directory to the root of the destination ISO file.
 EOF
         exit
 }
@@ -91,6 +92,7 @@ function parse_params() {
         source_iso="${script_dir}/ubuntu-original-$today.iso"
         destination_iso="${script_dir}/ubuntu-preseed-$today.iso"
         gpg_verify=1
+        include=0
 
         while :; do
                 case "${1-}" in
@@ -109,6 +111,7 @@ function parse_params() {
                         destination_iso="${2-}"
                         shift
                         ;;
+                -i | --include) include=1 ;;
                 -?*) die "Unknown option: $1" ;;
                 *) break ;;
                 esac
@@ -125,8 +128,8 @@ function parse_params() {
                 [[ ! -f "${source_iso}" ]] && die "💥 Source ISO file could not be found."
         fi
 
-        destination_iso=$(stat -f%R "${destination_iso}")
-        source_iso=$(stat -f%R  "${source_iso}")
+        destination_iso=$(perl -MCwd -e 'print Cwd::abs_path shift' "${destination_iso}")
+        source_iso=$(perl -MCwd -e 'print Cwd::abs_path shift' "${source_iso}")
 
         return 0
 }
@@ -151,18 +154,18 @@ log "🔎 Checking for required utilities..."
 log "👍 All required utilities are installed."
 
 #log "🔎 Checking the $HOME/.gnupg directory exists..."
-if [ ! -d $HOME/.gnupg ]; then
+if [ ! -d "$HOME/.gnupg" ]; then
     log "🔧 Creating the $HOME/.gnupg directory..."
-    mkdir $HOME/.gnupg
+    mkdir "$HOME/.gnupg"
     log "👍 Created the $HOME/.gnupg directory."
 #else
 #    log "👍 The $HOME/.gnupg directory exists."
 fi
 
 log "🔧 Setting correct ownership and permissions for $HOME/.gnupg..."
-chown -R $(whoami) $HOME/.gnupg/
-find ~/.gnupg -type f -exec chmod 600 {} \;
-find ~/.gnupg -type d -exec chmod 700 {} \;
+chown -R $(whoami) "$HOME/.gnupg/"
+find "$HOME/.gnupg" -type f -exec chmod 600 {} \;
+find "$HOME/.gnupg" -type d -exec chmod 700 {} \;
 log "👍 Correct ownership and permissions set for $HOME/.gnupg."
 
 if [ ! -f "${source_iso}" ]; then
@@ -249,6 +252,12 @@ log "🧩 Adding preseed configuration file..."
 cp "$preseed_file" "$tmpdir/preseed/custom.seed"
 log "👍 Added preseed file"
 
+if [ ${include} -eq 1 ]; then
+    log "🧩 Adding ./include directory..."
+    cp -r ./include "$tmpdir/include"
+    log "👍 Added ./include directory"
+fi
+
 log "👷 Updating $tmpdir/md5sum.txt with hashes of modified files..."
 # Using the full list of hashes causes long delays at boot.
 # For now, just include a couple of the files we changed.
@@ -260,7 +269,7 @@ log "👍 Updated hashes."
 
 log "📦 Repackaging extracted files into an ISO image..."
 cd "$tmpdir"
-xorriso -as mkisofs -r -V "ubuntu-preseed-$today" -J -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -isohybrid-mbr ${script_dir}/isohdpfx.bin -boot-info-table -input-charset utf-8 -eltorito-alt-boot -e boot/grub/efi.img -no-emul-boot -isohybrid-gpt-basdat -o "${destination_iso}" . &>/dev/null
+xorriso -as mkisofs -r -V "ubuntu-preseed-$today" -J -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -isohybrid-mbr "${script_dir}/isohdpfx.bin" -boot-info-table -input-charset utf-8 -eltorito-alt-boot -e boot/grub/efi.img -no-emul-boot -isohybrid-gpt-basdat -o "${destination_iso}" . &>/dev/null
 cd "$OLDPWD"
 log "👍 Repackaged into ${destination_iso}"
 
